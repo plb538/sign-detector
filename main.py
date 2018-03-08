@@ -43,16 +43,24 @@ if __name__ == "__main__":
     cv2.imshow("Color Thresholded Image", img_color_thresholded)
 
     # Edge detection
-    img_edges = np.array(img_color_thresholded)
-    img_edges = cv2.cvtColor(img_edges, cv2.COLOR_BGR2GRAY)
-    img_edges = cv2.Canny(img_edges, 100, 200)
-    #cv2.imshow("Image Edges", img_edges)
+    try:
+        img_edges = np.array(img_color_thresholded)
+        img_edges = cv2.cvtColor(img_edges, cv2.COLOR_BGR2GRAY)
+        img_edges = cv2.Canny(img_edges, 100, 200)
+        cv2.imshow("Image Edges", img_edges)
+    except Exception as e:
+        print "Could not determine edges"
+        print e
 
     # Contour finding
-    contours, hierarchy = cv2.findContours(img_edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    img_contours = np.array(cv2.cvtColor(img_edges, cv2.COLOR_GRAY2BGR))
-    cv2.drawContours(img_contours, contours, -1, (0, 255, 0), 3)
-    #cv2.imshow("Image Contours", img_contours)
+    try:
+        contours, hierarchy = cv2.findContours(img_edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        img_contours = np.array(cv2.cvtColor(img_edges, cv2.COLOR_GRAY2BGR))
+        cv2.drawContours(img_contours, contours, -1, (0, 255, 0), 3)
+        cv2.imshow("Image Contours", img_contours)
+    except Exception as e:
+        print "Could not determine counters"
+        print e
 
     # Find largest contour
     largest_contour = []
@@ -68,21 +76,25 @@ if __name__ == "__main__":
     cv2.imshow("Largest Contour", img_largest_contour)
 
     # Hough transform
-    lines = cv2.HoughLines(img_largest_contour, 1, np.pi/90, 50)
-    points = []
-    img_lines = cv2.cvtColor(img_largest_contour, cv2.COLOR_GRAY2BGR)
-    for rho, theta in lines[0]:
-        a = np.cos(theta)
-        b = np.sin(theta)
-        x0 = abs(int(a*rho))
-        y0 = abs(int(b*rho))
-        x1 = int(x0 + 1000*(-b))
-        y1 = int(y0 + 1000*(a))
-        x2 = int(x0 - 1000*(-b))
-        y2 = int(y0 - 1000*(a))
-        points.append([x0, y0])
-        cv2.line(img_lines, (x1, y1), (x2, y2), (0, 0, 255), 2)
-    cv2.imshow("Lines", img_lines)
+    try:
+        lines = cv2.HoughLines(img_largest_contour, 1, np.pi/180, 40)
+        points = []
+        img_lines = cv2.cvtColor(img_largest_contour, cv2.COLOR_GRAY2BGR)
+        for rho, theta in lines[0]:
+            a = np.cos(theta)
+            b = np.sin(theta)
+            x0 = abs(int(a*rho))
+            y0 = abs(int(b*rho))
+            x1 = int(x0 + 1000*(-b))
+            y1 = int(y0 + 1000*(a))
+            x2 = int(x0 - 1000*(-b))
+            y2 = int(y0 - 1000*(a))
+            points.append([x0, y0])
+            cv2.line(img_lines, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        cv2.imshow("Lines", img_lines)
+    except Exception as e:
+        print "Could not determine the lines"
+        print e
 
     # Perspective transform (To do)
 
