@@ -50,7 +50,6 @@ if __name__ == "__main__":
         cv2.imshow("Image Edges", img_edges)
     except Exception as e:
         print "Could not determine edges"
-        print e
 
     # Contour finding
     try:
@@ -60,24 +59,26 @@ if __name__ == "__main__":
         cv2.imshow("Image Contours", img_contours)
     except Exception as e:
         print "Could not determine counters"
-        print e
 
     # Find largest contour
-    largest_contour = []
-    largest_size = 0
-    for i in range(len(contours)):
-        tmp = len(contours[i])
-        if tmp > largest_size:
-            largest_size = tmp
-            largest_contour = contours[i]
-    img_largest_contour = np.uint8(np.zeros([height, width]))
-    for i in largest_contour:
-        img_largest_contour[i[0][0]][i[0][1]] = 255
-    cv2.imshow("Largest Contour", img_largest_contour)
+    try:
+        largest_contour = []
+        largest_size = 0
+        for i in range(len(contours)):
+            tmp = len(contours[i])
+            if tmp > largest_size:
+                largest_size = tmp
+                largest_contour = contours[i]
+        img_largest_contour = np.uint8(np.zeros([height, width]))
+        for i in largest_contour:
+            img_largest_contour[i[0][0]][i[0][1]] = 255
+        cv2.imshow("Largest Contour", img_largest_contour)
+    except Exception as e:
+        print "Could not determine largest counter"
 
     # Hough transform
     try:
-        lines = cv2.HoughLines(img_largest_contour, 1, np.pi/180, 40)
+        lines = cv2.HoughLines(img_largest_contour, 1, np.pi/90, 40)
         points = []
         img_lines = cv2.cvtColor(img_largest_contour, cv2.COLOR_GRAY2BGR)
         for rho, theta in lines[0]:
@@ -93,22 +94,20 @@ if __name__ == "__main__":
             cv2.line(img_lines, (x1, y1), (x2, y2), (0, 0, 255), 2)
         cv2.imshow("Lines", img_lines)
     except Exception as e:
-        print "Could not determine the lines"
-        print e
+        print "Could not determine lines"
 
     # Perspective transform (To do)
 
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-    # Unused stuff. May be useful to keep for now
-
-    # Harris corner detection (if needed)
+    # Harris corner detection (when needed)
     #img_gray = np.float32(img_gray)
     #dst = cv2.cornerHarris(img_gray, 5, 3,0.04)
     #dst = cv2.dilate(dst, None)
     #img[dst > 0.2*dst.max()]=[0, 0, 255]
 
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    # Unused stuff. May be useful to keep for now
     #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
     #img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel, iterations=5)
     #laplacian = cv2.Laplacian(img_gray, cv2.CV_64F)
