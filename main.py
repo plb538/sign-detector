@@ -24,57 +24,70 @@ if __name__ == "__main__":
     orig_img = cv2.imread("stop_sign1.jpeg")
     cv2.imshow("Orignal Image", orig_img)
 
-    # Get copy of image
-    img = orig_img[:]
+    # Copy the original image. Do this before operating on an image because
+    # img = orig_img does not copy the values, it copies the reference
+    img = np.array(orig_img)
 
     # Image dimensions
     height = np.size(img, 0)
     width = np.size(img, 1)
 
-    # Threshold image
-    img = bgr_threshhold(img, 80, 80, 110)
-    cv2.imshow("Color Thresholded Image", img)
-
     # Convert color space - img = [B G R] -> img_gray = [I]
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # fooled around with Canny params - could not see difference in output images
-    img_canny = cv2.Canny(img_gray, 100, 200)
-    cv2.imshow("Image Edges", img_canny)
 
-    # Contour collection here. add to hough below
+    # Threshold image
+    img_color_thresholded = bgr_threshhold(img, 80, 80, 110)
+    cv2.imshow("Color Thresholded Image", img_color_thresholded)
+
+    # Edge Detection
+    img_edges = np.array(img_color_thresholded)
+    img_edges = cv2.cvtColor(img_edges, cv2.COLOR_BGR2GRAY)
+    img_edges = cv2.Canny(img_edges, 100, 200)
+    cv2.imshow("Image Edges", img_edges)
+
+    # Contour Finding
+    contours, hierarchy = cv2.findContours(img_edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    img_contours = np.array(cv2.cvtColor(img_edges, cv2.COLOR_GRAY2BGR))
+    cv2.drawContours(img_contours, contours, -1, (0, 255, 0), 3)
+    cv2.imshow("Image Contours", img_contours)
+
+    # Find largest contour
+    largest_contour = []
+    largest_size = 0
+    for i in range(len(contours)):
+        tmp = len(contours[i])
+        if tmp > largest_size:
+            largest_size = tmp
+            largest_contour = contours[i]
+    img_largest_contour = np.uint8(np.zeros([height, width]))
+    for i in largest_contour:
+        img_largest_contour[i[0][0]][i[0][1]] = 255
+    cv2.imshow("Largest Contour", img_largest_contour)
 
     # Hough Transform
-    lines = cv2.HoughLines(img_canny, 1, np.pi/180, 40)
+    lines = cv2.HoughLines(img_largest_contour, 1, np.pi/90, 50)
     points = []
+    img_lines = cv2.cvtColor(img_largest_contour, cv2.COLOR_GRAY2BGR)
     for rho, theta in lines[0]:
         a = np.cos(theta)
         b = np.sin(theta)
-        x0 = a*rho
-        y0 = b*rho
-        points.append([])
-
-    # Display lines
-    for rho, theta in lines[0]:
-        a = np.cos(theta)
-        b = np.sin(theta)
-        x0 = a*rho
-        y0 = b*rho
+        x0 = abs(int(a*rho))
+        y0 = abs(int(b*rho))
         x1 = int(x0 + 1000*(-b))
         y1 = int(y0 + 1000*(a))
         x2 = int(x0 - 1000*(-b))
         y2 = int(y0 - 1000*(a))
+        points.append([x0, y0])
+        cv2.line(img_lines, (x1, y1), (x2, y2), (0, 0, 255), 2)
+    cv2.imshow("Lines", img_lines)
 
-        cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
-    cv2.imshow("Lines", img)
-
-
-    # Harris corner detection
+    # Harris Corner Detection (If needed)
     #img_gray = np.float32(img_gray)
     #dst = cv2.cornerHarris(img_gray, 5, 3,0.04)
     #dst = cv2.dilate(dst, None)
     #img[dst > 0.2*dst.max()]=[0, 0, 255]
 
-    # Perspective transform
+    # Perspective transform (To do)
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
@@ -85,7 +98,7 @@ if __name__ == "__main__":
     #laplacian = cv2.Laplacian(img_gray, cv2.CV_64F)
     #sobelx = cv2.Sobel(img_gray, cv2.CV_64F, 1, 0, ksize=5)
     #sobely = cv2.Sobel(img_gray, cv2.CV_64F, 0, 1, ksize=5)
+    #img_edges = np.uint8(abs(np.hypot(sobel_x, sobel_y)))
     #img_edges = cv2.medianBlur(img_edges, 3)
-
 
     print("Goodbye World")
