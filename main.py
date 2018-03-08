@@ -22,9 +22,9 @@ if __name__ == "__main__":
     print("Hello World")
 
     orig_img = cv2.imread("stop_sign1.jpeg")
-    cv2.imshow("Orignal Image", orig_img)
+    cv2.imshow("Original Image", orig_img)
 
-    # Copy the original image. Do this before operating on an image because
+    # Copy of original image. Do this before operating on an image because
     # img = orig_img does not copy the values, it copies the reference
     img = np.array(orig_img)
 
@@ -35,21 +35,24 @@ if __name__ == "__main__":
     # Convert color space - img = [B G R] -> img_gray = [I]
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
+    # Blur image for better lines
+    img = cv2.GaussianBlur(img, (7, 7), 0)
+
     # Threshold image
     img_color_thresholded = bgr_threshhold(img, 80, 80, 110)
     cv2.imshow("Color Thresholded Image", img_color_thresholded)
 
-    # Edge Detection
+    # Edge detection
     img_edges = np.array(img_color_thresholded)
     img_edges = cv2.cvtColor(img_edges, cv2.COLOR_BGR2GRAY)
     img_edges = cv2.Canny(img_edges, 100, 200)
-    cv2.imshow("Image Edges", img_edges)
+    #cv2.imshow("Image Edges", img_edges)
 
-    # Contour Finding
+    # Contour finding
     contours, hierarchy = cv2.findContours(img_edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     img_contours = np.array(cv2.cvtColor(img_edges, cv2.COLOR_GRAY2BGR))
     cv2.drawContours(img_contours, contours, -1, (0, 255, 0), 3)
-    cv2.imshow("Image Contours", img_contours)
+    #cv2.imshow("Image Contours", img_contours)
 
     # Find largest contour
     largest_contour = []
@@ -64,7 +67,7 @@ if __name__ == "__main__":
         img_largest_contour[i[0][0]][i[0][1]] = 255
     cv2.imshow("Largest Contour", img_largest_contour)
 
-    # Hough Transform
+    # Hough transform
     lines = cv2.HoughLines(img_largest_contour, 1, np.pi/90, 50)
     points = []
     img_lines = cv2.cvtColor(img_largest_contour, cv2.COLOR_GRAY2BGR)
@@ -81,18 +84,19 @@ if __name__ == "__main__":
         cv2.line(img_lines, (x1, y1), (x2, y2), (0, 0, 255), 2)
     cv2.imshow("Lines", img_lines)
 
-    # Harris Corner Detection (If needed)
-    #img_gray = np.float32(img_gray)
-    #dst = cv2.cornerHarris(img_gray, 5, 3,0.04)
-    #dst = cv2.dilate(dst, None)
-    #img[dst > 0.2*dst.max()]=[0, 0, 255]
-
     # Perspective transform (To do)
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
     # Unused stuff. May be useful to keep for now
+
+    # Harris corner detection (if needed)
+    #img_gray = np.float32(img_gray)
+    #dst = cv2.cornerHarris(img_gray, 5, 3,0.04)
+    #dst = cv2.dilate(dst, None)
+    #img[dst > 0.2*dst.max()]=[0, 0, 255]
+
     #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
     #img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel, iterations=5)
     #laplacian = cv2.Laplacian(img_gray, cv2.CV_64F)
