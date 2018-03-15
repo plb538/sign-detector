@@ -31,12 +31,13 @@ def getEdges(img, t1, t2):
 # Contour finding
 def getContours(img):
     try:
-        contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        img, contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
         # contours need color -> convert to BGR
         img = np.array(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
         cv2.drawContours(img, contours, -1, (0, 255, 0), 3)
         return img, contours
     except Exception as e:
+        print e
         print "Could not determine counters"
 
 
@@ -64,7 +65,8 @@ def getHough(img, thresh, r_acc, t_acc):
         lines = cv2.HoughLines(img, r_acc, np.pi/t_acc, thresh)
         # lines need color -> copy largest contour and convert to BGR
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        for rho, theta in lines[0]:
+        for line in lines:
+            rho, theta = line[0]
             a = np.cos(theta)
             b = np.sin(theta)
             x0 = int(a*rho)
@@ -78,13 +80,34 @@ def getHough(img, thresh, r_acc, t_acc):
     except Exception as e:
         print "Could not determine lines"
 
+
 # Harris corner detection
-def getCorners(img, bsize, ksize, k):
+def getCorners(img, bsize, ksize, k, t):
     try:
         tmp = cv2.cvtColor(np.float32(img), cv2.COLOR_BGR2GRAY)
         corners = cv2.cornerHarris(tmp, bsize, ksize, k)
         corners = cv2.dilate(corners, None)
-        img[corners > 0.05*corners.max()] = [255, 0, 0]
-        return img, corners
+        usable_corners = corners > t*corners.max()
+        # turn corners blue
+        img[usable_corners] = [255, 0, 0]
+        return img, corners, usable_corners
     except Exception as e:
         print "Could not determine corners"
+
+
+# Cluster corner points
+# does not work
+def clusterCorners(img, usable_corners, num_clusters):
+    try:
+        tmp = np.uint8(np.zeros([np.size(img, 0), np.size(img, 1)]))
+        tmp[usable_corners] = 255
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+        ret, label, center = cv2.kmeans(np.float32(tmp), num_clusters, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+        center = np.uint8(center)
+        print center[1,:]
+        res = center[label.flatten()]
+        res2 = res.reshape(img.shape)
+
+        return res2
+    except Exception as e:
+        print "Could not cluster corner points"

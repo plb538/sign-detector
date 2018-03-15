@@ -2,23 +2,21 @@
 
 import numpy as np
 import cv2
+print(cv2.__version__)
 import cv_functions as cvf
 
 if __name__ == "__main__":
     print("Hello World")
 
-    orig_img = cv2.imread("stop_sign4.jpeg")
+    orig_img = cv2.imread("stop_sign1.jpeg")
     cv2.imshow("Original Image", orig_img)
 
-    # Copy of original image. Do this before operating on an image because
-    # img = orig_img does not copy the values, it copies the reference
+    # Copy of original image
     img = np.array(orig_img)
 
     # Making the image larger seems to help find the largest contour
+    # need to determine best scale/ratio
     img = cv2.resize(img, None, fx=2, fy=2)
-
-    # Blur image for better lines
-    img = cv2.GaussianBlur(img, (7, 7), 0)
 
     # Threshold image
     img = cvf.bgrThreshhold(img, 100, 100, 110)
@@ -33,12 +31,18 @@ if __name__ == "__main__":
     img = cvf.getLargestContour(img, contours)
     cv2.imshow("Largest Contour", img)
 
-    img, lines = cvf.getHough(img, 40, 1, 180)
+    img, lines = cvf.getHough(img, 50, 1, 180)
     cv2.imshow("Lines", img)
 
-    img, corners = cvf.getCorners(img, 5, 5, 0.04)
+    # Blur image for better lines
+    img = cv2.GaussianBlur(img, (7, 7), 0)
+
+    img, corners, usable_corners = cvf.getCorners(img, 5, 5, 0.15, 0.05)
     cv2.imshow("Corners", img)
 
+    # does not work
+    #img = cvf.clusterCorners(img, usable_corners, 2)
+    #cv2.imshow("Clusters", img)
     # Perspective transform (To do)
 
     cv2.waitKey(0)
