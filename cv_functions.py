@@ -14,14 +14,14 @@ def bgrThreshhold(img, b, g, r):
                 j[0] = 0
                 j[1] = 0
                 j[2] = 0
-    return img
+    return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
 
 # Edge detection
 def getEdges(img, t1, t2):
     try:
         # edges need intensity -> convert to gray
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         img = cv2.Canny(img, t1, t2)
         return img
     except Exception as e:
@@ -34,11 +34,11 @@ def getContours(img):
         img, contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
         # contours need color -> convert to BGR
         img = np.array(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
-        cv2.drawContours(img, contours, -1, (0, 255, 0), 3)
+        cv2.drawContours(img, contours, -1, (255, 255, 255), 3)
         return img, contours
     except Exception as e:
         print e
-        print "Could not determine counters"
+        print "Could not determine contours"
 
 
 # Find largest contour
@@ -52,12 +52,21 @@ def getLargestContour(img, contours):
                 largest_size = tmp
                 largest_contour = contours[i]
         img_largest_contour = np.uint8(np.zeros([np.size(img, 0), np.size(img, 1)]))
-        for i in largest_contour:
-            img_largest_contour[i[0][0]][i[0][1]] = 255
-        return img_largest_contour
+        # for i in largest_contour:
+        #     img_largest_contour[i[0][0]][i[0][1]] = 255
+        img_largest_contour = cv2.drawContours(img, [largest_contour], -1, [255, 255, 255], -1)
+        return img_largest_contour, largest_contour
     except Exception as e:
-        print "Could not determine largest counter"
+        print "Could not determine largest contour"
 
+# crop to contour
+def crop(img, contour):
+    try:
+        rect = cv2.boundingRect(contour)
+        img = img[rect[1]-3:rect[1]+rect[3]+6, rect[0]-3:rect[0]+rect[2]+6]
+        return cv2.resize(img, (500, 500))
+    except Exception as e:
+        print "Could not crop image"
 
 # Hough transform
 def getHough(img, thresh, r_acc, t_acc):
@@ -111,3 +120,33 @@ def clusterCorners(img, usable_corners, num_clusters):
         return res2
     except Exception as e:
         print "Could not cluster corner points"
+
+# get intersection points
+def getIntersections(img, lines):
+    try:
+        intersections = []
+        for i in range(0, len(lines)-1):
+            rho1, theta1 = lines[i][0]
+            x1 = np.cos(theta1)
+            y1 = np.sin(theta1)
+            for j in range(i+1, len(lines)):
+                rho2, theta2 = lines[j][0]
+                x2 = np.cos(theta2)
+                y2 = np.sin(theta2)
+
+                p = np.cross([x1,y1,-rho1], [x2,y2,-rho2])
+
+                if abs(p[2]) > 0.0001:
+                    p = [p[0]/p[2], p[1]/p[2], 1]
+
+                    intx = p[0]
+                    inty = p[1]
+
+                    if intx > 0 and intx < img.shape[1] and inty > 0 and inty < img.shape[0]:
+                        intersections.append([intx, inty])
+                        cv2.circle(img, (int(intx), int(inty)), 3, [255,0,0], 3)
+        return img, intersections
+    except Exception as e:
+        print "Could not determine intersections"
+
+

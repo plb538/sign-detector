@@ -22,23 +22,29 @@ if __name__ == "__main__":
     img = cvf.bgrThreshhold(img, 100, 100, 110)
     cv2.imshow("Color Thresholded Image", img)
 
-    img = cvf.getEdges(img, 100, 200)
-    cv2.imshow("Image Edges", img)
-
     img, contours = cvf.getContours(img)
     cv2.imshow("Image Contours", img)
 
-    img = cvf.getLargestContour(img, contours)
+    img, contour = cvf.getLargestContour(img, contours)
     cv2.imshow("Largest Contour", img)
 
-    img, lines = cvf.getHough(img, 50, 1, 180)
+    img = cvf.crop(img, contour)
+    cv2.imshow("Cropped", img)
+
+    img = cvf.getEdges(img, 100, 200)
+    cv2.imshow("Image Edges", img)
+
+    img, lines = cvf.getHough(img, 65, 1, 60) # lowered theta threshold and overall threshold
     cv2.imshow("Lines", img)
 
-    # Blur image for better lines
-    img = cv2.GaussianBlur(img, (7, 7), 0)
+    img, intersections = cvf.getIntersections(img, lines)
+    cv2.imshow("Intersections", img)
 
-    img, corners, usable_corners = cvf.getCorners(img, 5, 5, 0.15, 0.05)
-    cv2.imshow("Corners", img)
+    # Blur image for better lines
+    # img = cv2.GaussianBlur(img, (7, 7), 0)
+
+    # img, corners, usable_corners = cvf.getCorners(img, 5, 5, 0.15, 0.05)
+    # cv2.imshow("Corners", img)
 
     # does not work
     #img = cvf.clusterCorners(img, usable_corners, 2)
