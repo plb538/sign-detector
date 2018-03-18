@@ -205,5 +205,14 @@ def stopSign_sortIntersections(img, intersections):
 
     return sort
 
-
+# perspective transform image using corresponding points
+# tform requires 4 points, so do tform for two rectangles of stop sign points and take average
+def perspective(img, img_ints, known_ints):
+    tform0 = cv2.getPerspectiveTransform(np.array([img_ints[0], img_ints[1], img_ints[4], img_ints[5]], np.float32), \
+                                         np.array([known_ints[0], known_ints[1], known_ints[4], known_ints[5]], np.float32))
+    tform1 = cv2.getPerspectiveTransform(np.array([img_ints[2], img_ints[3], img_ints[6], img_ints[7]], np.float32), \
+                                         np.array([known_ints[2], known_ints[3], known_ints[6], known_ints[7]], np.float32))
+    tform2 = (tform0+tform1)/2
+    img = cv2.warpPerspective(img, tform2, (img.shape[0], img.shape[1]))
+    return img
 

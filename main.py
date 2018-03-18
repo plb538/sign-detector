@@ -5,10 +5,16 @@ import cv2
 print(cv2.__version__)
 import cv_functions as cvf
 
+# known points of a stop sign for a 500x500 image from top-left clockwise
+STOPSIGN_KNOWNPOINTS = [[150., 5.], [350., 5.], \
+                       [495., 150.], [495., 350.], \
+                       [350., 495.], [150., 495.], \
+                       [5., 350.], [5., 150.]]
+
 if __name__ == "__main__":
     print("Hello World")
 
-    orig_img = cv2.imread("stop_sign1.jpeg")
+    orig_img = cv2.imread("stop_sign4.jpeg")
     cv2.imshow("Original Image", orig_img)
 
     # Copy of original image
@@ -41,6 +47,11 @@ if __name__ == "__main__":
     cv2.imshow("Intersections", img)
 
     intersections = cvf.stopSign_sortIntersections(img, intersections)
+
+    orig_img = cv2.resize(orig_img, None, fx=2, fy=2)
+    orig_img = cvf.crop(orig_img, contour)
+    img = cvf.perspective(orig_img, intersections, STOPSIGN_KNOWNPOINTS)
+    cv2.imshow("Transformed image", img)
 
     # Blur image for better lines
     # img = cv2.GaussianBlur(img, (7, 7), 0)
