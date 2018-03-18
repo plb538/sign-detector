@@ -149,4 +149,61 @@ def getIntersections(img, lines):
     except Exception as e:
         print "Could not determine intersections"
 
+# sort stop sign corners from top left clockwise
+def stopSign_sortIntersections(img, intersections):
+    sort = []
+    ints = []
+    # get rid of unwanted intersections
+    for i in intersections:
+        # get rid of points near corners (within 75px x and y)
+        if (i[0] > 75 and i[0] < 425) or (i[1] > 75 and i[1] < 425):
+            for j in ints:
+                # get rid of points that are within 10px of another
+                if abs(i[0]-j[0]) < 10 and abs(i[1]-j[1]) < 10:
+                    break
+            else:
+                ints.append(i)
+
+    xsort = sorted(ints, lambda a,b: cmp(a[0], b[0]))
+    ysort = sorted(ints, lambda a,b: cmp(a[1], b[1]))
+    # top two points
+    cand0 = ysort[0]
+    cand1 = ysort[1]
+    if cand0[0] > cand1[0]:
+        cand0, cand1 = cand1, cand0
+    sort.append(cand0)
+    sort.append(cand1)
+
+    # right two points
+    cand0 = xsort[-1]
+    cand1 = xsort[-2]
+    if cand0[1] > cand1[1]:
+        cand0, cand1 = cand1, cand0
+    sort.append(cand0)
+    sort.append(cand1)
+
+    # bottom two points
+    cand0 = ysort[-1]
+    cand1 = ysort[-2]
+    if cand0[0] < cand1[0]:
+        cand0, cand1 = cand1, cand0
+    sort.append(cand0)
+    sort.append(cand1)
+
+    # right two points
+    cand0 = xsort[0]
+    cand1 = xsort[1]
+    if cand0[1] < cand1[1]:
+        cand0, cand1 = cand1, cand0
+    sort.append(cand0)
+    sort.append(cand1)
+
+    imgc = img
+    for i in range(0, len(sort)):
+        cv2.putText(img, str(i), (sort[i][0], sort[i][1]), cv2.FONT_HERSHEY_SIMPLEX, 1, [0,255,0])
+    cv2.imshow("labelled corners", imgc)
+
+    return sort
+
+
 

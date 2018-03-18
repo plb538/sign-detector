@@ -40,6 +40,8 @@ if __name__ == "__main__":
     img, intersections = cvf.getIntersections(img, lines)
     cv2.imshow("Intersections", img)
 
+    intersections = cvf.stopSign_sortIntersections(img, intersections)
+
     # Blur image for better lines
     # img = cv2.GaussianBlur(img, (7, 7), 0)
 
