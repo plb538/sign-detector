@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 print(cv2.__version__)
 import cv_functions as cvf
+import thinning as th
 
 # known points of a stop sign for a 500x500 image from top-left clockwise
 STOPSIGN_KNOWNPOINTS = [[150., 5.], [350., 5.], \
@@ -15,10 +16,11 @@ TRIANGLESIGN_KNOWNPOINTS = [[250., 0.], [500., 500.], [0., 500.]]
 
 YELLOWSIGN_KNOWNPOINTS = [[250., 0.], [500., 250.], [250., 500.], [0., 250.]]
 
-if __name__ == "__main__":
-    print("Hello World")
 
-    orig_img = cv2.imread("yellow_sign4.jpeg")
+# Just moved your stuff here and copied as needed
+def imageOperation(orig_img):
+
+    orig_img = cv2.imread(orig_img)
     cv2.imshow("Original Image", orig_img)
 
     # Copy of original image
@@ -49,7 +51,7 @@ if __name__ == "__main__":
     img2, contours = cvf.getContours(img)
     cv2.imshow("Image Contours", img2)
 
-    img, contour = cvf.getLargestContour(img, contours)
+    img, contour = cvf.getLargestContour(img2, contours)
     cv2.imshow("Largest Contour", img)
 
     img = cvf.crop(img, contour)
@@ -101,24 +103,169 @@ if __name__ == "__main__":
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-    # Unused stuff. May be useful to keep for now
-    #kernel = cv2.cvf.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
-    #img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel, iterations=5)
-    #laplacian = cv2.Laplacian(img_gray, cv2.CV_64F)
-    #sobelx = cv2.Sobel(img_gray, cv2.CV_64F, 1, 0, ksize=5)
-    #sobely = cv2.Sobel(img_gray, cv2.CV_64F, 0, 1, ksize=5)
-    #img_edges = np.uint8(abs(np.hypot(sobel_x, sobel_y)))
-    #img_edges = cv2.medianBlur(img_edges, 3)
 
-    # Blur image for better lines
-    # img = cv2.GaussianBlur(img, (7, 7), 0)
+def videoOperation(v):
+    cap = cv2.VideoCapture(v)
+    num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fc = 0
+    # Number of frames to average
+    frame_buffer = 10
+    # if we go through x number of frames but dont find 3 good signs, reset good sign count
+    frames_to_check = 50
+    # if we have a good sign, add it to the list
+    good_sign = False
+    good_sign_count = 0
+    # if we find x number of good signs in a row, we clearly found a sign
+    good_signs = []
+    # set a previous color
+    prev_colour = "red"
+    while True:
+        average_contour = np.zeros([500, 500], dtype=np.float32)
+        for i in range(frame_buffer):
+            try:
+                fc += 1
+                if fc % frames_to_check == 0:
+                    good_sign_count = 0
+                    good_signs = []
+                ret, img = cap.read()
 
-    # img, corners, usable_corners = cvf.getCorners(img, 5, 5, 0.15, 0.05)
-    # cv2.imshow("Corners", img)
+                # very little difference in frames 1-5, so lets just call the last frame the original
+                if i == frame_buffer - 1:
+                    orig_img = img.copy()
 
-    # does not work
-    #img = cvf.clusterCorners(img, usable_corners, 2)
-    #cv2.imshow("Clusters", img)
-    # Perspective transform (To do)
+                img = cv2.GaussianBlur(img, (9, 9), 0)
+
+                # color thresholding using HSV space. Yellow may need to be tampered with
+                imgr, maskr, countr = cvf.colorThreshold(img, 140, 50, 50, 179, 255, 255)
+                imgy, masky, county = cvf.colorThreshold(img, 30, 50, 50, 40, 255, 255)
+
+                if county > countr:
+                    img = masky
+                    colour = "yellow"
+                else:
+                    img = maskr
+                    colour = "red"
+
+                # Oh looks like we are starting with a yellow sign.
+                # set previous sign to other color and restart
+                if colour != prev_colour:
+                    prev_colour = colour
+                    good_sign = False
+                    break
+
+                img = cvf.close(img, 7, 7)
+                #cv2.imshow("1", img)
+
+                img, contours = cvf.getContours(img)
+                #cv2.imshow("2", img)
+
+                img, contour = cvf.getLargestContour(img, contours)
+                #cv2.imshow("3", img)
+
+                img = cvf.crop(img, contour)
+                #cv2.imshow("4", img)
+
+                img = cv2.GaussianBlur(img, (13, 13), 0)
+                #cv2.imshow("5", img)
+
+                img = cvf.getEdges(img, 100, 200)
+                #cv2.imshow("6", img)
+
+                average_contour = cv2.add(np.float32(img), average_contour)
+
+                #cv2.waitKey(0)
+                #cv2.destroyAllWindows()
+
+            # If anything bad happens along the way, reset and begin again
+            except Exception as e:
+                good_sign = False
+                break
+        # Looks like nothing bad happened, lets continue
+        else:
+            try:
+                img = np.uint8(average_contour/frame_buffer)
+                img = cv2.GaussianBlur(img, (29, 29), 0)
+                ret, img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+                img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=2)
+
+                # Wasn't removing columns of pixels so I had to rotate
+                img[0:5][:] = 0
+                img[-1:-6][:] = 0
+                M = cv2.getRotationMatrix2D((500/2, 500/2), 90, 1)
+                img = cv2.warpAffine(img, M, (500, 500))
+                img[0:5][:] = 0
+                img[-1:-6][:] = 0
+                M = cv2.getRotationMatrix2D((500/2, 500/2), -90, 1)
+                img = cv2.warpAffine(img, M, (500, 500))
+
+                # Found this online. super useful for thinning lines
+                img = th.thinning(img)
+                cv2.imshow("Image Edges", img)
+
+                img, lines = cvf.getHough(img, 60, 1, 110)
+                #cv2.imshow("Lines", img)
+
+                img, intersections = cvf.getIntersections(img, lines)
+                #cv2.imshow("Intersections", img)
+
+                #cv2.waitKey(0)
+                #cv2.destroyAllWindows()
+                #exit(0)
+
+                orig_img = cvf.crop(orig_img, contour)
+                if colour == "yellow":
+                    # Yellow Sign
+                    pass
+                    final_intersections = cvf.yellowSign_sortIntersections(img, intersections)
+                    img = cvf.yellowSign_perspective(orig_img, final_intersections, YELLOWSIGN_KNOWNPOINTS)
+                    #cv2.imshow("Transformed image", img)
+
+                elif colour == "red":
+                    # Triangle sign
+                    if len(intersections) == 3:
+                        final_intersections = cvf.triangleSign_sortIntersections(img, intersections)
+                        img = cvf.triangleSign_affine(orig_img, final_intersections, TRIANGLESIGN_KNOWNPOINTS)
+                        if len(intersections) == 3 and len(final_intersections) == 3:
+                            good_sign = True
+
+                    # Stop sign
+                    else:
+                        final_intersections = cvf.stopSign_sortIntersections(img, intersections)
+                        img = cvf.stopSign_perspective(orig_img, final_intersections, STOPSIGN_KNOWNPOINTS)
+                        if len(intersections) == 16 and len(final_intersections) == 8:
+                            good_sign = True
+            # If anything bad happens along the way, reset and begin again
+            except Exception as e:
+                good_sign = False
+        # So you've made it this far without any errors? Well you must have a good sign.
+        # Add it to the list and incrememnt the count.
+        # If we can get 3 of these, then we must have found a sign
+        if good_sign is True:
+            good_sign_count += 1
+            good_signs.append(img)
+        # 3 good signs found!!! Time to leave the loop
+        if good_sign_count == 3:
+            break
+        if fc >= num_frames:
+            print "FAILED"
+            exit(0)
+        # Still not done looking. Continue...
+        else:
+            continue
+
+    cap.release()
+
+    # Show our good signs
+    for i in good_signs:
+        cv2.imshow("Img", i)
+        cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    print("Hello World")
+
+    #imageOperation("triangle_sign1.jpeg")
+    videoOperation("ss_vid1.mp4")
 
     print("Goodbye World")

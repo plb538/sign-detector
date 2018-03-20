@@ -34,6 +34,27 @@ def bgrThreshhold_red(img):
     return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), count
 
 
+def colorThreshold(img, lh, ls, lv, uh, us, uv):
+    try:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+        # define range of color in HSV
+        lower = np.array([lh, ls, lv])
+        upper = np.array([uh, us, uv])
+
+        # Threshold the HSV image
+        mask = cv2.inRange(img, lower, upper)
+
+        # Bitwise-AND mask and original image
+        res = cv2.bitwise_and(img, img, mask=mask)
+        img = cv2.cvtColor(res, cv2.COLOR_HSV2BGR)
+        count = np.sum(mask == 255)
+        return img, mask, count
+    except Exception as e:
+        print "Could not color threshold image"
+        return None, None
+
+
 # Edge detection
 def getEdges(img, t1, t2):
     try:
@@ -59,6 +80,7 @@ def close(img, width, height):
 # Contour finding
 def getContours(img):
     try:
+        #tmp = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         img, contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
         # contours need color -> convert to BGR
         img = np.array(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
@@ -228,7 +250,7 @@ def triangleSign_sortIntersections(img, intersections):
     imgc = img
     for i in range(0, len(sort)):
         cv2.putText(img, str(i), (sort[i][0], sort[i][1]), cv2.FONT_HERSHEY_SIMPLEX, 1, [0,255,0])
-    cv2.imshow("labelled corners", imgc)
+    #cv2.imshow("labelled corners", imgc)
 
     return sort
 
