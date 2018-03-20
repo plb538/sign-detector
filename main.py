@@ -13,10 +13,12 @@ STOPSIGN_KNOWNPOINTS = [[150., 5.], [350., 5.], \
 
 TRIANGLESIGN_KNOWNPOINTS = [[250., 0.], [500., 500.], [0., 500.]]
 
+YELLOWSIGN_KNOWNPOINTS = [[250., 0.], [500., 250.], [250., 500.], [0., 250.]]
+
 if __name__ == "__main__":
     print("Hello World")
 
-    orig_img = cv2.imread("triangle_sign4.jpg")
+    orig_img = cv2.imread("yellow_sign4.jpeg")
     cv2.imshow("Original Image", orig_img)
 
     # Copy of original image
@@ -30,8 +32,19 @@ if __name__ == "__main__":
         img = cv2.resize(img, None, fx=0.5, fy=0.5)
 
     # Threshold image
-    img = cvf.bgrThreshhold_red(img)
+    imgy, yellowCount = cvf.bgrThreshhold_yellow(img.copy())
+    imgr, redCount = cvf.bgrThreshhold_red(img.copy())
+    colour = ""
+    if yellowCount > redCount:
+        img = imgy
+        colour = "yellow"
+    else:
+        img = imgr
+        colour = "red"
     cv2.imshow("Color Thresholded Image", img)
+
+    img = cvf.close(img, 3, 3)
+    cv2.imshow("Closing", img)
 
     img2, contours = cvf.getContours(img)
     cv2.imshow("Image Contours", img2)
@@ -48,33 +61,42 @@ if __name__ == "__main__":
     img = cvf.getEdges(img, 100, 200)
     cv2.imshow("Image Edges", img)
 
-    img, lines = cvf.getHough(img, 60, 1, 100) # lowered theta threshold and overall threshold
+    img, lines = cvf.getHough(img, 60, 1, 100)
     cv2.imshow("Lines", img)
 
     img, intersections = cvf.getIntersections(img, lines)
     cv2.imshow("Intersections", img)
 
-    # Triangle sign
-    intersections = cvf.triangleSign_sortIntersections(img, intersections)
+    print "Intersections: " + str(len(intersections))
 
     if orig_img.shape[0] < 500 and orig_img.shape[1] < 500:
         orig_img = cv2.resize(orig_img, None, fx=2, fy=2)
     elif orig_img.shape[0] > 1000 and orig_img.shape[1] > 1000:
         orig_img = cv2.resize(orig_img, None, fx=0.5, fy=0.5)
     orig_img = cvf.crop(orig_img, contour)
-    img = cvf.triangleSign_affine(orig_img, intersections, TRIANGLESIGN_KNOWNPOINTS)
-    cv2.imshow("Transformed image", img)
 
-    # Stop sign
-    # intersections = cvf.stopSign_sortIntersections(img, intersections)
+    if colour == "yellow":
+        # Yellow Sign
+        pass
+        intersections = cvf.yellowSign_sortIntersections(img, intersections)
 
-    # if orig_img.shape[0] < 500 and orig_img.shape[1] < 500:
-    #     orig_img = cv2.resize(orig_img, None, fx=2, fy=2)
-    # elif orig_img.shape[0] > 1000 and orig_img.shape[1] > 1000:
-    #     orig_img = cv2.resize(orig_img, None, fx=0.5, fy=0.5)
-    # orig_img = cvf.crop(orig_img, contour)
-    # img = cvf.stopSign_perspective(orig_img, intersections, STOPSIGN_KNOWNPOINTS)
-    # cv2.imshow("Transformed image", img)
+        img = cvf.yellowSign_perspective(orig_img, intersections, YELLOWSIGN_KNOWNPOINTS)
+        cv2.imshow("Transformed image", img)
+
+    elif colour == "red":
+        # Triangle sign
+        if len(intersections) == 3:
+            intersections = cvf.triangleSign_sortIntersections(img, intersections)
+
+            img = cvf.triangleSign_affine(orig_img, intersections, TRIANGLESIGN_KNOWNPOINTS)
+            cv2.imshow("Transformed image", img)
+
+        # Stop sign
+        else:
+            intersections = cvf.stopSign_sortIntersections(img, intersections)
+
+            img = cvf.stopSign_perspective(orig_img, intersections, STOPSIGN_KNOWNPOINTS)
+            cv2.imshow("Transformed image", img)
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()

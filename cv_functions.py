@@ -3,18 +3,35 @@
 import numpy as np
 import cv2
 
+def bgrThreshhold_yellow(img):
+    count = 0
+    for i in img:
+        for j in i:
+            if int(j[2])-int(j[0]) > 90 and int(j[1])-int(j[0]) > 90:
+                j[0] = 255
+                j[1] = 255
+                j[2] = 255
+                count += 1
+            else:
+                j[0] = 0
+                j[1] = 0
+                j[2] = 0
+    return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), count
+
 def bgrThreshhold_red(img):
+    count = 0
     for i in img:
         for j in i:
             if int(j[2])-int(j[0]) > 100 and int(j[2])-int(j[1]) > 100:
                 j[0] = 255
                 j[1] = 255
                 j[2] = 255
+                count += 1
             else:
                 j[0] = 0
                 j[1] = 0
                 j[2] = 0
-    return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), count
 
 
 # Edge detection
@@ -45,7 +62,7 @@ def getContours(img):
         img, contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
         # contours need color -> convert to BGR
         img = np.array(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
-        cv2.drawContours(img, contours, -1, (0, 255, 0), 3)
+        cv2.drawContours(img, contours, -1, (0, 255, 0), 1)
         return img, contours
     except Exception as e:
         print e
@@ -64,8 +81,8 @@ def getLargestContour(img, contours):
                 largest_contour = contours[i]
         img_largest_contour = np.uint8(np.zeros([np.size(img, 0), np.size(img, 1)]))
         # for i in largest_contour:
-        #     img_largest_contour[i[0][0]][i[0][1]] = 255
-        img_largest_contour = cv2.drawContours(img, [largest_contour], -1, [255, 255, 255], -1)
+        #     img_largest_contour[i[0][1]][i[0][0]] = [0, 225, 0]
+        img_largest_contour = cv2.drawContours(img, [largest_contour], -1, 255, -1)
         return img_largest_contour, largest_contour
     except Exception as e:
         print "Could not determine largest contour"
@@ -173,6 +190,25 @@ def getIntersections(img, lines):
     except Exception as e:
         print "Could not determine intersections"
 
+# sort yellow sign corners from top clockwise
+def yellowSign_sortIntersections(img, intersections):
+    sort = []
+
+    xsort = sorted(intersections, lambda a,b: cmp(a[0], b[0]))
+    ysort = sorted(intersections, lambda a,b: cmp(a[1], b[1]))
+
+    sort.append(ysort[0])
+    sort.append(xsort[-1])
+    sort.append(ysort[-1])
+    sort.append(xsort[0])
+
+    imgc = img
+    for i in range(0, len(sort)):
+        cv2.putText(img, str(i), (sort[i][0], sort[i][1]), cv2.FONT_HERSHEY_SIMPLEX, 1, [0,255,0])
+    cv2.imshow("labelled corners", imgc)
+
+    return sort
+
 # sort triangle sign corners from top clockwise for ^ and bottom anticlockwise for v
 def triangleSign_sortIntersections(img, intersections):
     sort = []
@@ -254,7 +290,13 @@ def stopSign_sortIntersections(img, intersections):
     return sort
 
 # perspective transform image using corresponding points
-# tform requires 4 points, so do tform for two rectangles of stop sign points and take average
+def yellowSign_perspective(img, img_ints, known_ints):
+    tform0 = cv2.getPerspectiveTransform(np.array([img_ints[0], img_ints[1], img_ints[2], img_ints[3]], np.float32), \
+                                         np.array([known_ints[0], known_ints[1], known_ints[2], known_ints[3]], np.float32))
+    img = cv2.warpPerspective(img, tform0, (img.shape[0], img.shape[1]))
+    return img
+
+# affine transform image using corresponding points
 def triangleSign_affine(img, img_ints, known_ints):
     if img_ints[1][1] < img.shape[0]/2:
         for i in known_ints:
