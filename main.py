@@ -11,10 +11,14 @@ STOPSIGN_KNOWNPOINTS = [[150., 5.], [350., 5.], \
                        [350., 495.], [150., 495.], \
                        [5., 350.], [5., 150.]]
 
+TRIANGLESIGN_KNOWNPOINTS = [[250., 0.], [500., 500.], [0., 500.]]
+
+YELLOWSIGN_KNOWNPOINTS = [[250., 0.], [500., 250.], [250., 500.], [0., 250.]]
+
 if __name__ == "__main__":
     print("Hello World")
 
-    orig_img = cv2.imread("stop_sign4.jpeg")
+    orig_img = cv2.imread("yellow_sign4.jpeg")
     cv2.imshow("Original Image", orig_img)
 
     # Copy of original image
@@ -22,14 +26,28 @@ if __name__ == "__main__":
 
     # Making the image larger seems to help find the largest contour
     # need to determine best scale/ratio
-    img = cv2.resize(img, None, fx=2, fy=2)
+    if img.shape[0] < 500 and img.shape[1] < 500:
+        img = cv2.resize(img, None, fx=2, fy=2)
+    elif img.shape[0] > 1000 and img.shape[1] > 1000:
+        img = cv2.resize(img, None, fx=0.5, fy=0.5)
 
     # Threshold image
-    img = cvf.bgrThreshhold(img, 100, 100, 110)
+    imgy, yellowCount = cvf.bgrThreshhold_yellow(img.copy())
+    imgr, redCount = cvf.bgrThreshhold_red(img.copy())
+    colour = ""
+    if yellowCount > redCount:
+        img = imgy
+        colour = "yellow"
+    else:
+        img = imgr
+        colour = "red"
     cv2.imshow("Color Thresholded Image", img)
 
-    img, contours = cvf.getContours(img)
-    cv2.imshow("Image Contours", img)
+    img = cvf.close(img, 3, 3)
+    cv2.imshow("Closing", img)
+
+    img2, contours = cvf.getContours(img)
+    cv2.imshow("Image Contours", img2)
 
     img, contour = cvf.getLargestContour(img, contours)
     cv2.imshow("Largest Contour", img)
@@ -37,32 +55,48 @@ if __name__ == "__main__":
     img = cvf.crop(img, contour)
     cv2.imshow("Cropped", img)
 
+    img = cv2.GaussianBlur(img, (29, 29), 0)
+    cv2.imshow("Blur", img)
+
     img = cvf.getEdges(img, 100, 200)
     cv2.imshow("Image Edges", img)
 
-    img, lines = cvf.getHough(img, 65, 1, 60) # lowered theta threshold and overall threshold
+    img, lines = cvf.getHough(img, 60, 1, 100)
     cv2.imshow("Lines", img)
 
     img, intersections = cvf.getIntersections(img, lines)
     cv2.imshow("Intersections", img)
 
-    intersections = cvf.stopSign_sortIntersections(img, intersections)
+    print "Intersections: " + str(len(intersections))
 
-    orig_img = cv2.resize(orig_img, None, fx=2, fy=2)
+    if orig_img.shape[0] < 500 and orig_img.shape[1] < 500:
+        orig_img = cv2.resize(orig_img, None, fx=2, fy=2)
+    elif orig_img.shape[0] > 1000 and orig_img.shape[1] > 1000:
+        orig_img = cv2.resize(orig_img, None, fx=0.5, fy=0.5)
     orig_img = cvf.crop(orig_img, contour)
-    img = cvf.perspective(orig_img, intersections, STOPSIGN_KNOWNPOINTS)
-    cv2.imshow("Transformed image", img)
 
-    # Blur image for better lines
-    # img = cv2.GaussianBlur(img, (7, 7), 0)
+    if colour == "yellow":
+        # Yellow Sign
+        pass
+        intersections = cvf.yellowSign_sortIntersections(img, intersections)
 
-    # img, corners, usable_corners = cvf.getCorners(img, 5, 5, 0.15, 0.05)
-    # cv2.imshow("Corners", img)
+        img = cvf.yellowSign_perspective(orig_img, intersections, YELLOWSIGN_KNOWNPOINTS)
+        cv2.imshow("Transformed image", img)
 
-    # does not work
-    #img = cvf.clusterCorners(img, usable_corners, 2)
-    #cv2.imshow("Clusters", img)
-    # Perspective transform (To do)
+    elif colour == "red":
+        # Triangle sign
+        if len(intersections) == 3:
+            intersections = cvf.triangleSign_sortIntersections(img, intersections)
+
+            img = cvf.triangleSign_affine(orig_img, intersections, TRIANGLESIGN_KNOWNPOINTS)
+            cv2.imshow("Transformed image", img)
+
+        # Stop sign
+        else:
+            intersections = cvf.stopSign_sortIntersections(img, intersections)
+
+            img = cvf.stopSign_perspective(orig_img, intersections, STOPSIGN_KNOWNPOINTS)
+            cv2.imshow("Transformed image", img)
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
@@ -75,5 +109,16 @@ if __name__ == "__main__":
     #sobely = cv2.Sobel(img_gray, cv2.CV_64F, 0, 1, ksize=5)
     #img_edges = np.uint8(abs(np.hypot(sobel_x, sobel_y)))
     #img_edges = cv2.medianBlur(img_edges, 3)
+
+    # Blur image for better lines
+    # img = cv2.GaussianBlur(img, (7, 7), 0)
+
+    # img, corners, usable_corners = cvf.getCorners(img, 5, 5, 0.15, 0.05)
+    # cv2.imshow("Corners", img)
+
+    # does not work
+    #img = cvf.clusterCorners(img, usable_corners, 2)
+    #cv2.imshow("Clusters", img)
+    # Perspective transform (To do)
 
     print("Goodbye World")

@@ -3,18 +3,35 @@
 import numpy as np
 import cv2
 
-def bgrThreshhold(img, b, g, r):
+def bgrThreshhold_yellow(img):
+    count = 0
     for i in img:
         for j in i:
-            if j[0] < b and j[1] < g and j[2] > r:
+            if int(j[2])-int(j[0]) > 90 and int(j[1])-int(j[0]) > 90:
                 j[0] = 255
                 j[1] = 255
                 j[2] = 255
+                count += 1
             else:
                 j[0] = 0
                 j[1] = 0
                 j[2] = 0
-    return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), count
+
+def bgrThreshhold_red(img):
+    count = 0
+    for i in img:
+        for j in i:
+            if int(j[2])-int(j[0]) > 100 and int(j[2])-int(j[1]) > 100:
+                j[0] = 255
+                j[1] = 255
+                j[2] = 255
+                count += 1
+            else:
+                j[0] = 0
+                j[1] = 0
+                j[2] = 0
+    return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), count
 
 
 # Edge detection
@@ -27,6 +44,17 @@ def getEdges(img, t1, t2):
     except Exception as e:
         print "Could not determine edges"
 
+# opening
+def open(img, width, height):
+    kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (width, height))
+    img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kern)
+    return img
+
+# closing
+def close(img, width, height):
+    kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (width, height))
+    img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kern)
+    return img
 
 # Contour finding
 def getContours(img):
@@ -34,7 +62,7 @@ def getContours(img):
         img, contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
         # contours need color -> convert to BGR
         img = np.array(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
-        cv2.drawContours(img, contours, -1, (255, 255, 255), 3)
+        cv2.drawContours(img, contours, -1, (0, 255, 0), 1)
         return img, contours
     except Exception as e:
         print e
@@ -53,8 +81,8 @@ def getLargestContour(img, contours):
                 largest_contour = contours[i]
         img_largest_contour = np.uint8(np.zeros([np.size(img, 0), np.size(img, 1)]))
         # for i in largest_contour:
-        #     img_largest_contour[i[0][0]][i[0][1]] = 255
-        img_largest_contour = cv2.drawContours(img, [largest_contour], -1, [255, 255, 255], -1)
+        #     img_largest_contour[i[0][1]][i[0][0]] = [0, 225, 0]
+        img_largest_contour = cv2.drawContours(img, [largest_contour], -1, 255, -1)
         return img_largest_contour, largest_contour
     except Exception as e:
         print "Could not determine largest contour"
@@ -124,13 +152,25 @@ def clusterCorners(img, usable_corners, num_clusters):
 # get intersection points
 def getIntersections(img, lines):
     try:
-        intersections = []
+        lin = []
         for i in range(0, len(lines)-1):
             rho1, theta1 = lines[i][0]
-            x1 = np.cos(theta1)
-            y1 = np.sin(theta1)
             for j in range(i+1, len(lines)):
                 rho2, theta2 = lines[j][0]
+                if (abs(rho1-rho2) < 50 and abs(theta1-theta2) < np.pi/18) or \
+                   (abs(rho1+rho2) < 50 and abs(theta1-theta2) > np.pi-np.pi/18):
+                    break
+            else:
+                lin.append(lines[i])
+        lin.append(lines[-1])
+
+        intersections = []
+        for i in range(0, len(lin)-1):
+            rho1, theta1 = lin[i][0]
+            x1 = np.cos(theta1)
+            y1 = np.sin(theta1)
+            for j in range(i+1, len(lin)):
+                rho2, theta2 = lin[j][0]
                 x2 = np.cos(theta2)
                 y2 = np.sin(theta2)
 
@@ -142,12 +182,55 @@ def getIntersections(img, lines):
                     intx = p[0]
                     inty = p[1]
 
-                    if intx > 0 and intx < img.shape[1] and inty > 0 and inty < img.shape[0]:
+                    if intx > -img.shape[1]/2 and intx < img.shape[1]*1.5 and \
+                       inty > -img.shape[0]/2 and inty < img.shape[0]*1.5:
                         intersections.append([intx, inty])
                         cv2.circle(img, (int(intx), int(inty)), 3, [255,0,0], 3)
         return img, intersections
     except Exception as e:
         print "Could not determine intersections"
+
+# sort yellow sign corners from top clockwise
+def yellowSign_sortIntersections(img, intersections):
+    sort = []
+
+    xsort = sorted(intersections, lambda a,b: cmp(a[0], b[0]))
+    ysort = sorted(intersections, lambda a,b: cmp(a[1], b[1]))
+
+    sort.append(ysort[0])
+    sort.append(xsort[-1])
+    sort.append(ysort[-1])
+    sort.append(xsort[0])
+
+    imgc = img
+    for i in range(0, len(sort)):
+        cv2.putText(img, str(i), (sort[i][0], sort[i][1]), cv2.FONT_HERSHEY_SIMPLEX, 1, [0,255,0])
+    cv2.imshow("labelled corners", imgc)
+
+    return sort
+
+# sort triangle sign corners from top clockwise for ^ and bottom anticlockwise for v
+def triangleSign_sortIntersections(img, intersections):
+    sort = []
+
+    xsort = sorted(intersections, lambda a,b: cmp(a[0], b[0]))
+    ysort = sorted(intersections, lambda a,b: cmp(a[1], b[1]))
+
+    if ysort[1][1] > img.shape[0]/2:
+        sort.append(ysort[0])
+        sort.append(xsort[-1])
+        sort.append(xsort[0])
+    else:
+        sort.append(ysort[-1])
+        sort.append(xsort[-1])
+        sort.append(xsort[0])
+
+    imgc = img
+    for i in range(0, len(sort)):
+        cv2.putText(img, str(i), (sort[i][0], sort[i][1]), cv2.FONT_HERSHEY_SIMPLEX, 1, [0,255,0])
+    cv2.imshow("labelled corners", imgc)
+
+    return sort
 
 # sort stop sign corners from top left clockwise
 def stopSign_sortIntersections(img, intersections):
@@ -156,7 +239,8 @@ def stopSign_sortIntersections(img, intersections):
     # get rid of unwanted intersections
     for i in intersections:
         # get rid of points near corners (within 75px x and y)
-        if (i[0] > 75 and i[0] < 425) or (i[1] > 75 and i[1] < 425):
+        if ((i[0] > 75 and i[0] < 425) or (i[1] > 75 and i[1] < 425)) \
+            and i[0] > 0 and i[0] < img.shape[1] and i[1] > 0 and i[1] < img.shape[0]:
             for j in ints:
                 # get rid of points that are within 10px of another
                 if abs(i[0]-j[0]) < 10 and abs(i[1]-j[1]) < 10:
@@ -206,8 +290,25 @@ def stopSign_sortIntersections(img, intersections):
     return sort
 
 # perspective transform image using corresponding points
+def yellowSign_perspective(img, img_ints, known_ints):
+    tform0 = cv2.getPerspectiveTransform(np.array([img_ints[0], img_ints[1], img_ints[2], img_ints[3]], np.float32), \
+                                         np.array([known_ints[0], known_ints[1], known_ints[2], known_ints[3]], np.float32))
+    img = cv2.warpPerspective(img, tform0, (img.shape[0], img.shape[1]))
+    return img
+
+# affine transform image using corresponding points
+def triangleSign_affine(img, img_ints, known_ints):
+    if img_ints[1][1] < img.shape[0]/2:
+        for i in known_ints:
+            i[1] = img.shape[0]-i[1]
+    tform0 = cv2.getAffineTransform(np.array([img_ints[0], img_ints[1], img_ints[2]], np.float32), \
+                                    np.array([known_ints[0], known_ints[1], known_ints[2]], np.float32))
+    img = cv2.warpAffine(img, tform0, (img.shape[0], img.shape[1]))
+    return img
+
+# perspective transform image using corresponding points
 # tform requires 4 points, so do tform for two rectangles of stop sign points and take average
-def perspective(img, img_ints, known_ints):
+def stopSign_perspective(img, img_ints, known_ints):
     tform0 = cv2.getPerspectiveTransform(np.array([img_ints[0], img_ints[1], img_ints[4], img_ints[5]], np.float32), \
                                          np.array([known_ints[0], known_ints[1], known_ints[4], known_ints[5]], np.float32))
     tform1 = cv2.getPerspectiveTransform(np.array([img_ints[2], img_ints[3], img_ints[6], img_ints[7]], np.float32), \
