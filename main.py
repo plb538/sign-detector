@@ -2,7 +2,6 @@
 
 import numpy as np
 import cv2
-print(cv2.__version__)
 import cv_functions as cvf
 import thinning as th
 
@@ -33,6 +32,9 @@ def imageOperation(orig_img):
     elif img.shape[0] > 1000 and img.shape[1] > 1000:
         img = cv2.resize(img, None, fx=0.5, fy=0.5)
 
+    cv2.imshow("Orignal image", img)
+    cv2.waitKey(0)
+
     # Threshold image
     imgy, yellowCount = cvf.bgrThreshhold_yellow(img.copy())
     imgr, redCount = cvf.bgrThreshhold_red(img.copy())
@@ -43,33 +45,43 @@ def imageOperation(orig_img):
     else:
         img = imgr
         colour = "red"
+
     cv2.imshow("Color Thresholded Image", img)
+    cv2.waitKey(0)
 
     img = cvf.close(img, 3, 3)
     cv2.imshow("Closing", img)
+    cv2.waitKey(0)
 
     img2, contours = cvf.getContours(img)
     cv2.imshow("Image Contours", img2)
+    cv2.waitKey(0)
 
     img, contour = cvf.getLargestContour(img2, contours)
     cv2.imshow("Largest Contour", img)
+    cv2.waitKey(0)
 
     img = cvf.crop(img, contour)
     cv2.imshow("Cropped", img)
+    cv2.waitKey(0)
 
     img = cv2.GaussianBlur(img, (29, 29), 0)
     cv2.imshow("Blur", img)
+    cv2.waitKey(0)
 
     img = cvf.getEdges(img, 100, 200)
     cv2.imshow("Image Edges", img)
+    cv2.waitKey(0)
 
     img, lines = cvf.getHough(img, 60, 1, 100)
     cv2.imshow("Lines", img)
+    cv2.waitKey(0)
 
     img, intersections = cvf.getIntersections(img, lines)
     cv2.imshow("Intersections", img)
+    cv2.waitKey(0)
 
-    print "Intersections: " + str(len(intersections))
+    #print "Intersections: " + str(len(intersections))
 
     if orig_img.shape[0] < 500 and orig_img.shape[1] < 500:
         orig_img = cv2.resize(orig_img, None, fx=2, fy=2)
@@ -106,12 +118,11 @@ def imageOperation(orig_img):
 
 def videoOperation(v):
     cap = cv2.VideoCapture(v)
-    num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fc = 0
     # Number of frames to average
-    frame_buffer = 10
+    frame_buffer = 8
     # if we go through x number of frames but dont find 3 good signs, reset good sign count
-    frames_to_check = 50
+    frames_to_check = 40
     # if we have a good sign, add it to the list
     good_sign = False
     good_sign_count = 0
@@ -128,6 +139,9 @@ def videoOperation(v):
                     good_sign_count = 0
                     good_signs = []
                 ret, img = cap.read()
+                if img is None:
+                    print "FAILED"
+                    exit(0)
 
                 # very little difference in frames 1-5, so lets just call the last frame the original
                 if i == frame_buffer - 1:
@@ -136,7 +150,7 @@ def videoOperation(v):
                 img = cv2.GaussianBlur(img, (9, 9), 0)
 
                 # color thresholding using HSV space. Yellow may need to be tampered with
-                imgr, maskr, countr = cvf.colorThreshold(img, 140, 50, 50, 179, 255, 255)
+                imgr, maskr, countr = cvf.colorThreshold(img, 115, 110, 20, 179, 255, 255)
                 imgy, masky, county = cvf.colorThreshold(img, 30, 50, 50, 40, 255, 255)
 
                 if county > countr:
@@ -154,27 +168,18 @@ def videoOperation(v):
                     break
 
                 img = cvf.close(img, 7, 7)
-                #cv2.imshow("1", img)
 
                 img, contours = cvf.getContours(img)
-                #cv2.imshow("2", img)
 
                 img, contour = cvf.getLargestContour(img, contours)
-                #cv2.imshow("3", img)
 
                 img = cvf.crop(img, contour)
-                #cv2.imshow("4", img)
 
                 img = cv2.GaussianBlur(img, (13, 13), 0)
-                #cv2.imshow("5", img)
 
                 img = cvf.getEdges(img, 100, 200)
-                #cv2.imshow("6", img)
 
                 average_contour = cv2.add(np.float32(img), average_contour)
-
-                #cv2.waitKey(0)
-                #cv2.destroyAllWindows()
 
             # If anything bad happens along the way, reset and begin again
             except Exception as e:
@@ -184,6 +189,7 @@ def videoOperation(v):
         else:
             try:
                 img = np.uint8(average_contour/frame_buffer)
+
                 img = cv2.GaussianBlur(img, (29, 29), 0)
                 ret, img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
                 img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=2)
@@ -200,17 +206,10 @@ def videoOperation(v):
 
                 # Found this online. super useful for thinning lines
                 img = th.thinning(img)
-                cv2.imshow("Image Edges", img)
 
                 img, lines = cvf.getHough(img, 60, 1, 110)
-                #cv2.imshow("Lines", img)
 
                 img, intersections = cvf.getIntersections(img, lines)
-                #cv2.imshow("Intersections", img)
-
-                #cv2.waitKey(0)
-                #cv2.destroyAllWindows()
-                #exit(0)
 
                 orig_img = cvf.crop(orig_img, contour)
                 if colour == "yellow":
@@ -218,7 +217,6 @@ def videoOperation(v):
                     pass
                     final_intersections = cvf.yellowSign_sortIntersections(img, intersections)
                     img = cvf.yellowSign_perspective(orig_img, final_intersections, YELLOWSIGN_KNOWNPOINTS)
-                    #cv2.imshow("Transformed image", img)
 
                 elif colour == "red":
                     # Triangle sign
@@ -246,9 +244,6 @@ def videoOperation(v):
         # 3 good signs found!!! Time to leave the loop
         if good_sign_count == 3:
             break
-        if fc >= num_frames:
-            print "FAILED"
-            exit(0)
         # Still not done looking. Continue...
         else:
             continue
@@ -257,7 +252,7 @@ def videoOperation(v):
 
     # Show our good signs
     for i in good_signs:
-        cv2.imshow("Img", i)
+        cv2.imshow("Good image", i)
         cv2.waitKey(0)
     cv2.destroyAllWindows()
 
@@ -265,7 +260,50 @@ def videoOperation(v):
 if __name__ == "__main__":
     print("Hello World")
 
-    #imageOperation("triangle_sign1.jpeg")
-    videoOperation("ss_vid1.mp4")
+    # Stop signs
+    ss_img1 = "stop_sign1.jpeg"
+    ss_img2 = "stop_sign2.jpeg"
+    ss_img3 = "stop_sign3.jpeg"
+    ss_img4 = "stop_sign4.jpeg"
+
+    # Red triangle signs
+    trs_img1 = "triangle_sign1.jpeg"
+    trs_img2 = "triangle_sign2.jpeg"
+    trs_img3 = "triangle_sign3.jpeg"
+    trs_img4 = "triangle_sign4.jpeg"
+
+    # Yellow triangle signs
+    tys_img1 = "yellow_sign1.jpeg"
+    tys_img2 = "yellow_sign2.jpeg"
+    tys_img3 = "yellow_sign3.jpeg"
+    tys_img4 = "yellow_sign4.jpeg"
+
+    # Stop sign videos
+    ss_vid1 = "ss_vid1.mp4"
+    ss_vid2 = "ss_vid2.mp4"
+    ss_vid3 = "ss_vid3.mp4"
+    ss_vid4 = "ss_vid4.mp4"
+    ss_vid5 = "ss_vid5.mp4"
+    ss_vid6 = "ss_vid6.mp4"
+
+    
+    imageOperation(ss_img3)
+    imageOperation(ss_img4)
+    imageOperation(trs_img4)
+    imageOperation(trs_img2)
+    imageOperation(tys_img4)
+    imageOperation(tys_img3)
+
+    cap = cv2.VideoCapture(ss_vid1)
+    while True:
+        ret, img = cap.read()
+        cv2.imshow("Frame", img)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    cap.release()
+
+    videoOperation(ss_vid1)
+    videoOperation(ss_vid2)
+    videoOperation(ss_vid3)
 
     print("Goodbye World")
